@@ -6,9 +6,10 @@
 #include <chrono>
 
 constexpr int max_n = 12;
+constexpr float ratio[3] = {0.875, 0.125};
 
 int n;
-int max_depth = 25;
+int max_depth = 28;
 
 struct node
 {
@@ -71,14 +72,15 @@ public:
         }
         for (int index = n * n - 1; index >= 0; index--)
         {
-            group_counter[group_rename[group_id[index]]] += board[index];
+            group_counter[find_group(group_id[index])] += board[index];
         }
         int res = 0;
-        for (int i = 1; i <= id_counter; i++)
+        for (char i = 1; i <= id_counter; i++)
         {
-            res += ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
+			res += (int)ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
         }
-        return h = (int)(ceil((res + ((board.count() ^ res) & 1)) * (8.0 / 9.0) + board.count() / (3.0 * 9.0)));
+        h = (int)(ceil(res * ratio[0] + board.count() / 3.0 * ratio[1]));
+		return h = h + (((int)ceil(board.count() / 3.0) ^ h) & 1);
     }
 
     bool operator<(const node& other) const
@@ -87,16 +89,31 @@ public:
             (depth + heuristic() == other.depth + other.heuristic() && heuristic() > other.heuristic());
     }
 
-    friend std::ostream& operator<<(std::ostream& o, node p)
+    friend std::ostream& operator<<(std::ostream& o, const node& p)
     {
-        for (int i = 0; i < n; i++)
-        {
-            for (int j = 0; j < n; j++)
-            {
-                o << p.board[i * n + j] << " ";
-            }
-            o << std::endl;
-        }
+        o << p.depth << std::endl;
+		for (int i = 0; i < n; i++)
+		{
+			for (int j = 0; j < n; j++)
+			{
+				if (p.operation[(i * n + j) * 4 + 0])
+				{
+					o << i << ", " << j << ", 2" << std::endl;
+				}
+				if (p.operation[(i * n + j) * 4 + 1])
+				{
+					o << i << ", " << j - 1 << ", 1" << std::endl;
+				}
+				if (p.operation[(i * n + j) * 4 + 2])
+				{
+					o << i - 1 << ", " << j << ", 3" << std::endl;
+				}
+				if (p.operation[(i * n + j) * 4 + 3])
+				{
+					o << i - 1 << ", " << j - 1 << ", 4" << std::endl;
+				}
+			}
+		}
         return o;
     }
 };
@@ -158,7 +175,7 @@ node solve(node& starter, int& pop_count)
             index -= n + 1;
         }
 
-        if (flip_counter >= 3) { continue; }
+        if (flip_counter > 1) { continue; }
 
         // Handle the 12 operations at index, and push them into open_list
 
@@ -314,13 +331,15 @@ int main()
 {
     std::ios::sync_with_stdio(false);
 
-    char file_name[] = "../A star/input/input0.txt";
+    char input_file[] = "../A star/input/input0.txt";
+	char output_file[] = "../A star/output/input0.txt";
 
-    for (int k = 4; k <= 4; k++)
+    for (int k = 0; k <= 9; k++)
     {
-        file_name[21] = '0' + k;
+		input_file[21] = '0' + k;
+		output_file[22] = '0' + k;
         std::ifstream in;
-        in.open(file_name);
+        in.open(input_file);
         in >> n;
 
         node starter;
@@ -347,7 +366,13 @@ int main()
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
         std::cout << "Test case " << k << ": n = " << n << ", depth = " << ans.depth << ", pop count = " << pop_count << ", time = " << (double)(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << " seconds" << std::endl;
-    }
+
+		std::ofstream out;
+		out.open(output_file, std::ios::ate | std::ios::out);
+		out << ans;
+		out.flush();
+		out.close();
+	}
 
     return 0;
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22)
 project(AI_Lab_1_A_star)
 project(AI_Lab_1_CSP)
 

@@ -4,9 +4,11 @@
 #include <queue>
 #include <fstream>
 #include <chrono>
+#include <unordered_set>
+#include <algorithm>
 
 constexpr int max_n = 12;
-constexpr float ratio[3] = {0.875, 0.125};
+constexpr float ratio[2] = {0.9, 0.1};
 
 int n;
 int max_depth = 28;
@@ -39,6 +41,8 @@ public:
     int heuristic() const
     {
         if (h > 0) { return h; }
+
+		/* Find all connected blocks and the size of each connected block. */
         char id_counter = 0;
         for (int i = 0; i < n; i++)
         {
@@ -75,13 +79,57 @@ public:
             group_counter[find_group(group_id[index])] += board[index];
         }
         int res = 0;
-        for (char i = 1; i <= id_counter; i++)
+        for (int i = 1; i <= id_counter; i++)
         {
+			/* The minimum number of steps required for each connected block is
+			 * the size of the connected block divided by 3 with the same parity as the size of the connected block. */
 			res += (int)ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
         }
+		/* Another heuristic function: directly divide the number of 1's by 3.
+		 * The two are combined in a certain ratio. */
         h = (int)(ceil(res * ratio[0] + board.count() / 3.0 * ratio[1]));
 		return h = h + (((int)ceil(board.count() / 3.0) ^ h) & 1);
     }
+
+	int operation_count(int index) const
+	{
+		int i = index / n;
+		int j = index % n;
+		int ret = 0;
+
+		if (i > 0 && j > 0)
+		{
+			ret += operation[index * 4] + operation[index * 4 + 1] + operation[index * 4 + 2];
+		}
+
+		if (i > 0 && j < n - 1)
+		{
+			index++;
+			ret += operation[index * 4] + operation[index * 4 + 1] + operation[index * 4 + 3];
+			index--;
+		}
+
+		if (i < n - 1 && j > 0)
+		{
+			index += n;
+			ret += operation[index * 4] + operation[index * 4 + 2] + operation[index * 4 + 3];
+			index -= n;
+		}
+
+		if (i < n - 1 && j < n - 1)
+		{
+			index += n + 1;
+			ret += operation[index * 4 + 1] + operation[index * 4 + 2] + operation[index * 4 + 3];
+			index -= n + 1;
+		}
+
+		return ret;
+	}
+
+	int find_first() const
+	{
+		return board._Find_first();
+	}
 
     bool operator<(const node& other) const
     {
@@ -116,6 +164,22 @@ public:
 		}
         return o;
     }
+
+	struct equal
+	{
+		bool operator()(const node& a, const node& b) const
+		{
+			return (a.board ^ b.board).none();
+		}
+	};
+
+	struct hash
+	{
+		size_t operator()(const node& a) const
+		{
+			return std::hash<std::bitset<max_n * max_n>>().operator()(a.board);
+		}
+	};
 };
 
 char node::group_id[max_n * max_n] = {};
@@ -125,95 +189,81 @@ char node::group_rename[max_n * max_n + 1] = {};
 node solve(node& starter, int& pop_count)
 {
     std::priority_queue<node> open_list;
+	std::unordered_set<node, node::hash, node::equal> close_list;
     open_list.push(starter);
     pop_count = 0;
 
     while (!open_list.empty())
     {
         node current_node = open_list.top();
-        open_list.pop();
+		open_list.pop();
+		pop_count++;
 
-        pop_count++;
+		auto old = close_list.find(current_node);
+
+		if (old != close_list.end() &&
+			node::equal().operator()(*old, current_node) &&
+			current_node < *old)
+		{
+			continue;
+		}
+		close_list.insert(current_node);
 
         if (current_node.depth + current_node.heuristic() > max_depth) { continue; }
 
         if (current_node.board.none()) { return current_node; }
 
-        int index = current_node.board._Find_first();
+        int index = current_node.find_first();
         int i = index / n;
         int j = index % n;
         current_node.h = 0;
         current_node.depth += 1;
 
-        // Check if this number has been flipped over 3 times
+        /* Check if this number has been flipped over 1 times. */
 
-        int flip_counter = 0;
-
-        if (i > 0 && j > 0)
-        {
-            flip_counter += current_node.operation[index * 4] + current_node.operation[index * 4 + 1] + current_node.operation[index * 4 + 2];
-        }
-
-        if (i > 0 && j < n - 1)
-        {
-            index++;
-            flip_counter += current_node.operation[index * 4] + current_node.operation[index * 4 + 1] + current_node.operation[index * 4 + 3];
-            index--;
-        }
-
-        if (i < n - 1 && j > 0)
-        {
-            index += n;
-            flip_counter += current_node.operation[index * 4] + current_node.operation[index * 4 + 2] + current_node.operation[index * 4 + 3];
-            index -= n;
-        }
-
-        if (i < n - 1 && j < n - 1)
-        {
-            index += n + 1;
-            flip_counter += current_node.operation[index * 4 + 1] + current_node.operation[index * 4 + 2] + current_node.operation[index * 4 + 3];
-            index -= n + 1;
-        }
+        int flip_counter = current_node.operation_count(index);
 
         if (flip_counter > 1) { continue; }
 
-        // Handle the 12 operations at index, and push them into open_list
+        /* Handle the 12 operations at index, and push them into open_list. */
 
         current_node.board.flip(index);
 
-        if (i > 0 && j > 0)
-        {
-            if (!current_node.operation[index * 4])
-            {
-                current_node.operation[index * 4] = true;
-                current_node.board.flip(index - 1);
-                current_node.board.flip(index - n);
-                open_list.push(current_node);
-                current_node.board.flip(index - 1);
-                current_node.board.flip(index - n);
-                current_node.operation[index * 4] = false;
-            }
-            if (!current_node.operation[index * 4 + 1])
-            {
-                current_node.operation[index * 4 + 1] = true;
-                current_node.board.flip(index - 1);
-                current_node.board.flip(index - 1 - n);
-                open_list.push(current_node);
-                current_node.board.flip(index - 1);
-                current_node.board.flip(index - 1 - n);
-                current_node.operation[index * 4 + 1] = false;
-            }
-            if (!current_node.operation[index * 4 + 2])
-            {
-                current_node.operation[index * 4 + 2] = true;
-                current_node.board.flip(index - 1 - n);
-                current_node.board.flip(index - n);
-                open_list.push(current_node);
-                current_node.board.flip(index - 1 - n);
-                current_node.board.flip(index - n);
-                current_node.operation[index * 4 + 2] = false;
-            }
-        }
+		if (i < n - 1 && j < n - 1)
+		{
+			index += n + 1;
+			if (!current_node.operation[index * 4 + 1])
+			{
+				current_node.operation[index * 4 + 1] = true;
+				current_node.board.flip(index);
+				current_node.board.flip(index - 1);
+				open_list.push(current_node);
+				current_node.board.flip(index);
+				current_node.board.flip(index - 1);
+				current_node.operation[index * 4 + 1] = false;
+			}
+			if (!current_node.operation[index * 4 + 2])
+			{
+				current_node.operation[index * 4 + 2] = true;
+				current_node.board.flip(index);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4 + 2] = false;
+			}
+			if (!current_node.operation[index * 4 + 3])
+			{
+				current_node.operation[index * 4 + 3] = true;
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4 + 3] = false;
+			}
+			index -= n + 1;
+		}
 
         if (i > 0 && j < n - 1)
         {
@@ -287,43 +337,42 @@ node solve(node& starter, int& pop_count)
             index -= n;
         }
 
-        if (i < n - 1 && j < n - 1)
-        {
-            index += n + 1;
-            if (!current_node.operation[index * 4 + 1])
-            {
-                current_node.operation[index * 4 + 1] = true;
-                current_node.board.flip(index);
-                current_node.board.flip(index - 1);
-                open_list.push(current_node);
-                current_node.board.flip(index);
-                current_node.board.flip(index - 1);
-                current_node.operation[index * 4 + 1] = false;
-            }
-            if (!current_node.operation[index * 4 + 2])
-            {
-                current_node.operation[index * 4 + 2] = true;
-                current_node.board.flip(index);
-                current_node.board.flip(index - n);
-                open_list.push(current_node);
-                current_node.board.flip(index);
-                current_node.board.flip(index - n);
-                current_node.operation[index * 4 + 2] = false;
-            }
-            if (!current_node.operation[index * 4 + 3])
-            {
-                current_node.operation[index * 4 + 3] = true;
-                current_node.board.flip(index - 1);
-                current_node.board.flip(index - n);
-                open_list.push(current_node);
-                current_node.board.flip(index - 1);
-                current_node.board.flip(index - n);
-                current_node.operation[index * 4 + 3] = false;
-            }
-            index -= n + 1;
-        }
+		if (i > 0 && j > 0)
+		{
+			if (!current_node.operation[index * 4])
+			{
+				current_node.operation[index * 4] = true;
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4] = false;
+			}
+			if (!current_node.operation[index * 4 + 1])
+			{
+				current_node.operation[index * 4 + 1] = true;
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - 1 - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - 1 - n);
+				current_node.operation[index * 4 + 1] = false;
+			}
+			if (!current_node.operation[index * 4 + 2])
+			{
+				current_node.operation[index * 4 + 2] = true;
+				current_node.board.flip(index - 1 - n);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1 - n);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4 + 2] = false;
+			}
+		}
     }
 
+	/* Never reach unless max_depth is too small. 28 is enough :). */
     return {};
 }
 
@@ -332,12 +381,12 @@ int main()
     std::ios::sync_with_stdio(false);
 
     char input_file[] = "../A star/input/input0.txt";
-	char output_file[] = "../A star/output/input0.txt";
+	char output_file[] = "../A star/output/output0.txt";
 
     for (int k = 0; k <= 9; k++)
     {
 		input_file[21] = '0' + k;
-		output_file[22] = '0' + k;
+		output_file[23] = '0' + k;
         std::ifstream in;
         in.open(input_file);
         in >> n;

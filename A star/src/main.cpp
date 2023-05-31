@@ -7,7 +7,6 @@
 #include <unordered_set>
 
 constexpr int max_n = 12;
-constexpr float ratio[2] = {0.9, 0.1};
 
 int n;
 int max_depth = 25;
@@ -80,17 +79,14 @@ public:
 		{
 			group_counter[find_group(group_id[index])] += board[index];
 		}
-		int res = 0;
+		h = 0;
 		for (int i = 1; i <= id_counter; i++)
 		{
 			/* The minimum number of steps required for each connected block is
 			 * the size of the connected block divided by 3 with the same parity as the size of the connected block. */
-			res += (int)ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
+			h += (int)ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
 		}
-		/* Another heuristic function: directly divide the number of 1's by 3.
-		 * The two are combined in a certain ratio. */
-		h = (int)(ceil(res * ratio[0] + board.count() / 3.0 * ratio[1]));
-		return h = h + (((int)ceil(board.count() / 3.0) ^ h) & 1);
+		return h;
 #endif
 	}
 
@@ -134,10 +130,20 @@ public:
 		return board._Find_first();
 	}
 
+	std::string to_string() const
+	{
+		return board.to_string();
+	}
+
 	bool operator<(const node& other) const
 	{
 		return depth + heuristic() > other.depth + other.heuristic() ||
 			(depth + heuristic() == other.depth + other.heuristic() && heuristic() > other.heuristic());
+	}
+
+	bool operator==(const node& other) const
+	{
+		return (board ^ other.board).none();
 	}
 
 	friend std::ostream& operator<<(std::ostream& o, const node& p)
@@ -168,21 +174,6 @@ public:
 		return o;
 	}
 
-	struct equal
-	{
-		bool operator()(const node& a, const node& b) const
-		{
-			return (a.board ^ b.board).none();
-		}
-	};
-
-	struct hash
-	{
-		size_t operator()(const node& a) const
-		{
-			return std::hash<std::bitset<max_n * max_n>>().operator()(a.board);
-		}
-	};
 };
 
 char node::group_id[max_n * max_n] = {};
@@ -192,7 +183,7 @@ char node::group_rename[max_n * max_n + 1] = {};
 node solve(node& starter, int& pop_count)
 {
 	std::priority_queue<node> open_list;
-	std::unordered_set<node, node::hash, node::equal> close_list;
+	std::unordered_set<std::string> close_list;
 	open_list.push(starter);
 	pop_count = 0;
 
@@ -202,15 +193,13 @@ node solve(node& starter, int& pop_count)
 		open_list.pop();
 		pop_count++;
 
-		auto old = close_list.find(current_node);
+		auto old = close_list.find(current_node.to_string());
 
-		if (old != close_list.end() &&
-			node::equal().operator()(*old, current_node) &&
-			current_node < *old)
+		if (old != close_list.end())
 		{
 			continue;
 		}
-		close_list.insert(current_node);
+		close_list.insert(current_node.to_string());
 
 		if (current_node.depth + current_node.heuristic() > max_depth) { continue; }
 
@@ -347,7 +336,7 @@ int main()
 		auto end = std::chrono::system_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-		std::cout << "Test case " << k << ": n = " << n << ", depth = " << ans.depth << ", pop count = " << pop_count << ", time = " << (double)(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den << " seconds" << std::endl;
+		std::cout << "Test case " << k << ": n = " << n << ", depth = " << ans.depth << ", pop count = " << pop_count << ", time = " << (double)(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den * std::chrono::milliseconds::period::den << " ms" << std::endl;
 
 		std::ofstream out;
 		out.open(output_file, std::ios::ate | std::ios::out);

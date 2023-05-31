@@ -42,7 +42,12 @@ public:
 		return 0;
 #else
 		if (h > 0) { return h; }
-
+#ifdef SIMPLEHEURISTIC
+		/* The minimum number of steps required is the size of the map divided by 3
+		 * with the same parity as the size of the map. */
+		h = ceil(board.count() / 3.0);
+		return h = h + ((h ^ board.count()) & 1);
+#else
 		/* Find all connected blocks and the size of each connected block. */
 		char id_counter = 0;
 		for (int i = 0; i < n; i++)
@@ -87,6 +92,7 @@ public:
 			h += (int)ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
 		}
 		return h;
+#endif
 #endif
 	}
 

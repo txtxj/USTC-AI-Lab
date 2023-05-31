@@ -18,14 +18,15 @@ int request_count[max_size[0]] = {};
 
 bool cmp(int x, int y)
 {
-	/* 优先安排已有工作量少的，工作量相等的情况下优先安排剩余请求数少的人 */
+	/* Priority is given to those who already have less workload
+	 * and to those who have fewer remaining requests in case of equal workload. */
 	return duty_count[x] == duty_count[y] ? request_count[x] < request_count[y] : duty_count[x] < duty_count[y];
 }
 
 bool check()
 {
-	/* 不能工作连续两个班次的约束已在搜索过程中满足，
-	 * 此处仅需判断是否每个宿管阿姨被分配了 min_limit 次值班 */
+	/* The constraint of not being able to work two consecutive shifts has been satisfied during the search,
+	 * Here only need to determine if each aunt is assigned min_limit number of shifts. */
 	for (int i = 0; i < n; i++)
 	{
 		if (duty_count[i] < min_limit)
@@ -77,10 +78,10 @@ inline bool try_assign(int nn, int dd, int ss)
 	return ret;
 }
 
-/* 试图从第 dd 天的 ss 时间段工作状态开始搜索赋值 */
+/* Try to search for assignments starting from the ss time period working state on day dd. */
 bool solve(int dd, int ss)
 {
-	/* 求出当前点的值域 */
+	/* Find the value range of the current point. */
 	std::vector<int> d_region;
 	int last_duty = 0;
 	for (int i = 0; i < n; i++)
@@ -97,7 +98,7 @@ bool solve(int dd, int ss)
 		}
 	}
 
-	/* 无法满足每个人的最少工作量 */
+	/* Unable to meet the minimum workload for each individual. */
 	if (last_duty > (d - dd) * s - ss)
 	{
 		return false;
@@ -106,7 +107,7 @@ bool solve(int dd, int ss)
 	std::sort(d_region.begin(), d_region.end(), cmp);
 	auto iter = d_region.begin();
 	auto end = d_region.end();
-	/* 先安排请求在这一天工作的人 */
+	/* Arrange first for those who request to work during this time period. */
 	while (iter != end)
 	{
 		int nn = *iter;
@@ -123,7 +124,7 @@ bool solve(int dd, int ss)
 
 	iter = d_region.begin();
 	end = d_region.end();
-	/* 再安排没有请求在这一天工作的人 */
+	/* Re-arrange for those who have not requested to work during this time period. */
 	while (iter != end)
 	{
 		int nn = *iter;

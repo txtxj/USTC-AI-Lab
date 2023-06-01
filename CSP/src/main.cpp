@@ -158,15 +158,12 @@ int main()
 {
 	std::ios::sync_with_stdio(false);
 
-	char input_file[] = "../CSP/input/input0.txt";
-	char output_file[] = "../CSP/output/output0.txt";
-
 	std::string tmp_str;
 
 	for (int k = 0; k <= 9; k++)
 	{
-		input_file[18] = '0' + k;
-		output_file[20] = '0' + k;
+		std::string input_file = "../CSP/input/input" + std::to_string(k) + ".txt";
+		std::string output_file = "../CSP/output/output" + std::to_string(k) + ".txt";
 		std::ifstream in;
 		in.open(input_file);
 

@@ -42,12 +42,7 @@ public:
 		return 0;
 #else
 		if (h > 0) { return h; }
-#ifdef SIMPLEHEURISTIC
-		/* The minimum number of steps required is the size of the map divided by 3
-		 * with the same parity as the size of the map. */
-		h = ceil(board.count() / 3.0);
-		return h = h + ((h ^ board.count()) & 1);
-#else
+#ifdef UNADMISSIBLE
 		/* Find all connected blocks and the size of each connected block. */
 		char id_counter = 0;
 		for (int i = 0; i < n; i++)
@@ -92,6 +87,10 @@ public:
 			h += (int)ceil(group_counter[i] / 3.0) + (((int)ceil(group_counter[i] / 3.0) ^ group_counter[i]) & 1);
 		}
 		return h;
+#else
+		/* The minimum number of steps required is the size of the map divided by 3
+		 * with the same parity as the size of the map. */
+		return h = ceil(board.count() / 3.0);
 #endif
 #endif
 	}
@@ -298,6 +297,76 @@ node solve(node& starter, int& pop_count)
 			}
 			index -= n;
 		}
+
+		if (i == n - 1 && j < n - 1)
+		{
+			index++;
+			if (!current_node.operation[index * 4])
+			{
+				current_node.operation[index * 4] = true;
+				current_node.board.flip(index);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4] = false;
+			}
+			if (!current_node.operation[index * 4 + 1])
+			{
+				current_node.operation[index * 4 + 1] = true;
+				current_node.board.flip(index);
+				current_node.board.flip(index - 1 - n);
+				open_list.push(current_node);
+				current_node.board.flip(index);
+				current_node.board.flip(index - 1 - n);
+				current_node.operation[index * 4 + 1] = false;
+			}
+			if (!current_node.operation[index * 4 + 3])
+			{
+				current_node.operation[index * 4 + 3] = true;
+				current_node.board.flip(index - 1 - n);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1 - n);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4 + 3] = false;
+			}
+			index--;
+		}
+
+		if (i == n - 1 && j > 0)
+		{
+			if (!current_node.operation[index * 4])
+			{
+				current_node.operation[index * 4] = true;
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4] = false;
+			}
+			if (!current_node.operation[index * 4 + 1])
+			{
+				current_node.operation[index * 4 + 1] = true;
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - 1 - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1);
+				current_node.board.flip(index - 1 - n);
+				current_node.operation[index * 4 + 1] = false;
+			}
+			if (!current_node.operation[index * 4 + 2])
+			{
+				current_node.operation[index * 4 + 2] = true;
+				current_node.board.flip(index - 1 - n);
+				current_node.board.flip(index - n);
+				open_list.push(current_node);
+				current_node.board.flip(index - 1 - n);
+				current_node.board.flip(index - n);
+				current_node.operation[index * 4 + 2] = false;
+			}
+		}
 	}
 
 	/* Never reach unless max_depth is too small. 25 is enough :). */
@@ -308,13 +377,10 @@ int main()
 {
 	std::ios::sync_with_stdio(false);
 
-	char input_file[] = "../A star/input/input0.txt";
-	char output_file[] = "../A star/output/output0.txt";
-
 	for (int k = 0; k <= 9; k++)
 	{
-		input_file[21] = '0' + k;
-		output_file[23] = '0' + k;
+		std::string input_file = "../A star/input/input" + std::to_string(k) + ".txt";
+		std::string output_file = "../A star/output/output" + std::to_string(k) + ".txt";
 		std::ifstream in;
 		in.open(input_file);
 		in >> n;
